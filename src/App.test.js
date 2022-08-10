@@ -1,25 +1,55 @@
-import { render, screen,fireEvent } from '@testing-library/react';
-import App from './App';
+import {
+  render,
+  screen,
+  waitForElementToBeRemoved,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import mockFetchs from "./mocks/mocksFetch";
+import App from "./App";
 
-test('renders button red', () => {
-  render(<App />);
-  const link=screen.getByRole("button")
-  expect(link).toHaveStyle({"background-color":"red"});
-  fireEvent.click(link);
-  expect(link).toHaveStyle({"background-color":"blue"});
+beforeEach(() => {
+  jest.spyOn(window, "fetch").mockImplementation(mockFetchs);
 });
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
-
-
-test("check checkbox",()=>{
+test("renders the landing page", async () => {
   render(<App />);
-  const testId=screen.getByTestId("html-check");
-  const link=screen.getByRole("button")
-  expect(link).toHaveStyle({"background-color":"red"});
-  expect(testId).toBeChecked();
-  fireEvent.click(testId);
-  expect(testId).not.toBeChecked();
-  expect(link).toHaveStyle({"background-color":"blue"});
 
+  expect(screen.getByRole("heading")).toHaveTextContent(/Doggy Directory/);
+  expect(screen.getByRole("combobox")).toHaveDisplayValue("Select a breed");
+  expect(
+    await screen.findByRole("option", { name: "husky" })
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+  expect(screen.getByRole("img")).toBeInTheDocument();
+});
+
+test("should be able to search and display dog image results", async () => {
+  render(<App />);
+
+  //Simulate selecting an option and verifying its value
+  const select = screen.getByRole("combobox");
+  expect(
+    await screen.findByRole("option", { name: "cattledog" })
+  ).toBeInTheDocument();
+  userEvent.selectOptions(select, "cattledog");
+  expect(select).toHaveValue("cattledog");
+
+  //Initiate the search request
+  const searchBtn = screen.getByRole("button", { name: "Search" });
+  expect(searchBtn).toBeEnabled();
+  userEvent.click(searchBtn);
+
+  //Loading state displays and gets removed once results are displayed
+  await waitForElementToBeRemoved(() => screen.queryByText(/Loading/i));
+
+  //Verify image display and results count
+  const dogImages = screen.getAllByRole("img");
+  expect(dogImages).toHaveLength(2);
+  expect(screen.getByText(/2 Results/i)).toBeInTheDocument();
+  expect(dogImages[0]).toHaveAccessibleName("cattledog 1 of 2");
+  expect(dogImages[1]).toHaveAccessibleName("cattledog 2 of 2");
 });
